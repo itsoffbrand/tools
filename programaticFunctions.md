@@ -1,7 +1,6 @@
 # Deferred Programmatic JS Loading System
 
-This system is an adaption of Timothy Ricks's Component JS solution.
--> https://www.timothyricks.com/resources/javascript-inside-webflow-components
+This system is an adaption of [Timothy Ricks's Component JS solution](https://www.timothyricks.com/resources/javascript-inside-webflow-components).
 
 Our upgrade provides a method for deferred and programmatic JavaScript loading large component heavy websites.
 It allows for efficient loading of JavaScript functions based on viewport visibility and other customizable options.

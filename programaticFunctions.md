@@ -190,5 +190,3 @@ pageFunctions.addFunction('lazyLoadImages', function() {
 });
 </script>
 ```
-
-This README provides an overview of your deferred programmatic JS loading system, including installation instructions, usage examples, and API reference. You can further customize it by adding more specific examples or additional sections as needed for your enterprise sites.

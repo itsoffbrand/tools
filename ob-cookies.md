@@ -1,6 +1,6 @@
 # OB Cookie Consent Implementation
 
-This document outlines the implementation of a cookie consent mechanism using JavaScript. The code provides a user interface for accepting or rejecting cookies, and manages Google Analytics tracking based on user consent.
+This code is not fully GDPR complient, but mostly.
 
 ## Features
 

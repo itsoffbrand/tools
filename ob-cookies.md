@@ -43,7 +43,7 @@ function initCookies() {
   const rejectButton = cookieBanner?.querySelector('[data-cookie="reject"]');
   const modifyButtons = document.querySelectorAll('[data-cookie="modify"]');
   const COOKIE_FLAG_KEY = "cookiesAccepted";
-  const GA_MEASUREMENT_ID = "G-09WK5TC5DF";
+  const GA_MEASUREMENT_ID = "ADD_ID_HERE";
 
   function getCookieFlag() {
     return localStorage.getItem(COOKIE_FLAG_KEY);

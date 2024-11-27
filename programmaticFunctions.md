@@ -12,6 +12,7 @@ It allows for efficient loading of JavaScript functions based on viewport visibi
 3. [Usage](#usage)
    - [Head Section](#head-section)
    - [Footer Section](#footer-section)
+   - [Methods](#methods)
    - [Component Usage](#component-usage)
      - [Immediate Function](#immediate-function)
      - [Deferred Function](#deferred-function)
@@ -43,15 +44,46 @@ Add the following script to the `<head>` section of your HTML:
   global.pageFunctions = global.pageFunctions || {
     executed: {},
     functions: {},
+    observers: [],
+    active: false,
+
+    // Add Function (existing method)
     addFunction: function(id, fn, options) {
       if (!this.functions[id]) {
         this.functions[id] = { fn: fn, options: options };
       }
     },
+
+    // New method to clean up before SPA transitions
+    cleanup: function() {
+      // Disconnect all observers
+      this.observers.forEach(observer => {
+        if (observer && observer.disconnect) {
+          observer.disconnect();
+        }
+      });
+      
+      // Clear observers array
+      this.observers = [];
+      
+      // Clear execution states
+      this.executed = {};
+      
+      // Reset added flag
+      this.added = false;
+      
+      // Set active flag to false
+      this.active = false;
+      
+      console.log('Cleaned up pageFunctions observers and states');
+    },
+
+    // Modified executeFunctions to store observer references
     executeFunctions: function() {
-      if (this.added) return;
-      this.added = true;
-      document.addEventListener('DOMContentLoaded', () => {
+      if (this.active) return;
+      this.active = true;
+
+      const executeAll = () => {
         for (const id in this.functions) {
           if (!this.executed[id]) {
             try {
@@ -63,7 +95,7 @@ Add the following script to the `<head>` section of your HTML:
               if (options.immediate) {
                 fn();
                 this.executed[id] = true;
-                continue; // Skip setting up observer
+                continue;
               }
 
               const element = document.querySelector(options.selector);
@@ -80,11 +112,21 @@ Add the following script to the `<head>` section of your HTML:
                       fn();
                       this.executed[id] = true;
                       observer.unobserve(entry.target);
+                      
+                      // Remove observer from our tracking array
+                      const index = this.observers.indexOf(observer);
+                      if (index > -1) {
+                        this.observers.splice(index, 1);
+                      }
                     }
                   });
                 }, observerOptions);
 
                 observer.observe(element);
+                
+                // Store observer reference
+                this.observers.push(observer);
+                
               } else {
                 console.error(`Element not found for function ${id}`);
               }
@@ -93,7 +135,22 @@ Add the following script to the `<head>` section of your HTML:
             }
           }
         }
-      });
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', executeAll);
+      } else {
+        executeAll();
+      }
+    },
+
+    // New method to handle SPA transitions
+    handlePageTransition: function() {
+      // Clean up existing observers and states
+      this.cleanup();
+      
+      // Re-execute functions for new page content
+      this.executeFunctions();
     }
   };
 })(window);
@@ -109,6 +166,18 @@ Add the following script to the footer of your HTML:
 <script>
   pageFunctions.executeFunctions();
 </script>
+```
+
+### Methods
+
+Initialise
+```html
+pageFunctions.executeFunctions();
+```
+
+Destroy
+```html
+pageFunctions.cleanup();
 ```
 
 ### Component Usage

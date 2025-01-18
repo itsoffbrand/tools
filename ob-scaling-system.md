@@ -1,4 +1,4 @@
-# OFF+BRAND Fluid Scaling System
+# OFF+BRAND Fluid Scaling System v0.0.5
 
 A lightweight, CSS-driven fluid scaling system that maintains design proportions across viewports. Perfect for Webflow projects that need precise scaling behavior.
 
@@ -7,6 +7,7 @@ A lightweight, CSS-driven fluid scaling system that maintains design proportions
 - Pure CSS scaling (no runtime calculations)
 - Maintains exact design proportions
 - Smooth scaling between breakpoints
+- Global scale adjustment
 - Easy to implement
 - Zero dependencies
 - Minimal setup required
@@ -21,10 +22,11 @@ A lightweight, CSS-driven fluid scaling system that maintains design proportions
     --min-width: 992px;      /* Width where scaling starts */
     --max-width: 2560px;     /* Width where scaling stops */
     --design-width: 1440;    /* Your design's reference width */
+    --scale-factor: 1;       /* Global scale adjustment (1 = 100%) */
     
     /* Scaling calculations */
     --fluid-container: clamp(var(--min-width), 100vw, var(--max-width));
-    --fluid-font: calc(var(--fluid-container) / var(--design-width) * 16);
+    --fluid-font: calc(var(--fluid-container) / var(--design-width) * 16 * var(--scale-factor));
 }
 
 html {
@@ -41,8 +43,34 @@ Adjust the core variables to match your design:
     --min-width: 992px;      /* Your minimum width */
     --max-width: 2560px;     /* Your maximum width */
     --design-width: 1440;    /* Your design width */
+    --scale-factor: 1;       /* Adjust scale as needed */
 }
 ```
+
+## Global Scale Adjustment
+
+Need to scale your entire design up or down? Use the `--scale-factor`:
+
+```css
+/* Scale everything to 80% of original size */
+:root {
+    --scale-factor: 0.8;
+}
+
+/* Scale everything to 120% of original size */
+:root {
+    --scale-factor: 1.2;
+}
+```
+
+Common scale factors:
+- 0.8 = 80% scale
+- 0.9 = 90% scale
+- 1.0 = 100% scale (default)
+- 1.1 = 110% scale
+- 1.2 = 120% scale
+
+This affects all rem-based measurements uniformly without requiring changes to individual elements.
 
 ## Usage
 
@@ -209,6 +237,7 @@ h1 { font-size: 2rem; }
 3. Maintain consistent units throughout your project
 4. Design at 1440px for optimal results
 5. Consider browser zoom behavior
+6. Use the scale factor for quick global adjustments
 
 ## License
 

@@ -4,7 +4,7 @@ A powerful browser console script to analyze DOM complexity and identify optimiz
 
 ## 🚀 Quick Start
 
-1. Copy the entire script from `dom-analyzer.js`
+1. Copy the entire script from the snippet below
 2. Open your website in Chrome/Firefox/Edge
 3. Open DevTools (F12 or right-click → Inspect)
 4. Go to the Console tab

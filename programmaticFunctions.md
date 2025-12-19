@@ -16,6 +16,7 @@ It allows for efficient loading of JavaScript functions based on viewport visibi
    - [Component Usage](#component-usage)
      - [Immediate Function](#immediate-function)
      - [Deferred Function](#deferred-function)
+     - [Persistent Function (SPA)](#persistent-function-spa)
 4. [API Reference](#api-reference)
 5. [Examples](#examples)
 
@@ -44,94 +45,132 @@ Add the following script to the `<head>` section of your HTML:
   global.pageFunctions = global.pageFunctions || {
     executed: {},
     functions: {},
-    observers: [],
-    active: false,
+    debug: false,
 
-    // Add Function (existing method)
-    addFunction: function(id, fn, options) {
-      if (!this.functions[id]) {
-        this.functions[id] = { fn: fn, options: options };
+    log: function(message) {
+      if (this.debug) {
+        console.log('[pageFunctions] ' + message);
       }
     },
 
-    // New method to clean up before SPA transitions
-    cleanup: function() {
-      // Disconnect all observers
-      this.observers.forEach(observer => {
-        if (observer && observer.disconnect) {
-          observer.disconnect();
-        }
-      });
-      
-      // Clear observers array
-      this.observers = [];
-      
-      // Clear execution states
-      this.executed = {};
-      
-      // Reset added flag
-      this.added = false;
-      
-      // Set active flag to false
-      this.active = false;
-      
-      console.log('Cleaned up pageFunctions observers and states');
+    addFunction: function(id, fn, options) {
+      if (!this.functions[id]) {
+        this.functions[id] = { 
+          fn: fn, 
+          options: options || {},
+          observer: null
+        };
+      }
     },
 
-    // Modified executeFunctions to store observer references
+    removeFunction: function(id) {
+      if (this.functions[id]) {
+        // Disconnect observer if it exists
+        if (this.functions[id].observer) {
+          this.functions[id].observer.disconnect();
+          this.log('Disconnected observer for: ' + id);
+        }
+        
+        // Remove function and execution state
+        delete this.functions[id];
+        delete this.executed[id];
+        
+        this.log('Removed function: ' + id);
+        return true;
+      }
+      return false;
+    },
+
+    cleanup: function() {
+      var idsToRemove = [];
+      
+      for (var id in this.functions) {
+        var funcObj = this.functions[id];
+        
+        // Disconnect observer if it exists
+        if (funcObj.observer) {
+          funcObj.observer.disconnect();
+          funcObj.observer = null;
+        }
+        
+        // Mark non-persistent functions for removal
+        if (!funcObj.options.persistent) {
+          idsToRemove.push(id);
+        }
+      }
+      
+      // Remove non-persistent functions
+      for (var i = 0; i < idsToRemove.length; i++) {
+        delete this.functions[idsToRemove[i]];
+        delete this.executed[idsToRemove[i]];
+      }
+      
+      // Reset execution state for persistent functions (so they can re-run)
+      for (var id in this.functions) {
+        delete this.executed[id];
+      }
+      
+      // Reset active flag
+      this.active = false;
+      
+      this.log('Cleanup complete. Removed ' + idsToRemove.length + ' non-persistent functions. ' + 
+               Object.keys(this.functions).length + ' persistent functions retained.');
+    },
+
     executeFunctions: function() {
       if (this.active) return;
       this.active = true;
+      
+      var self = this;
 
-      const executeAll = () => {
-        for (const id in this.functions) {
-          if (!this.executed[id]) {
+      var executeAll = function() {
+        for (var id in self.functions) {
+          if (!self.executed[id]) {
             try {
-              const funcObj = this.functions[id];
-              const fn = funcObj.fn;
-              const options = funcObj.options || {};
+              var funcObj = self.functions[id];
+              var fn = funcObj.fn;
+              var options = funcObj.options;
               
               // Check if immediate execution is requested
               if (options.immediate) {
                 fn();
-                this.executed[id] = true;
+                self.executed[id] = true;
+                self.log('Executed immediately: ' + id);
                 continue;
               }
 
-              const element = document.querySelector(options.selector);
+              var element = document.querySelector(options.selector);
               if (element) {
-                const observerOptions = {
+                var observerOptions = {
                   root: options.root || null,
                   rootMargin: options.rootMargin || '0px',
                   threshold: options.threshold !== undefined ? options.threshold : 0
                 };
 
-                const observer = new IntersectionObserver((entries, observer) => {
-                  entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                      fn();
-                      this.executed[id] = true;
-                      observer.unobserve(entry.target);
-                      
-                      // Remove observer from our tracking array
-                      const index = this.observers.indexOf(observer);
-                      if (index > -1) {
-                        this.observers.splice(index, 1);
+                // Use IIFE to capture id in closure
+                (function(functionId, funcObject) {
+                  var observer = new IntersectionObserver(function(entries, obs) {
+                    entries.forEach(function(entry) {
+                      if (entry.isIntersecting) {
+                        funcObject.fn();
+                        self.executed[functionId] = true;
+                        obs.unobserve(entry.target);
+                        funcObject.observer = null;
+                        self.log('Executed on intersection: ' + functionId);
                       }
-                    }
-                  });
-                }, observerOptions);
+                    });
+                  }, observerOptions);
 
-                observer.observe(element);
-                
-                // Store observer reference
-                this.observers.push(observer);
+                  observer.observe(element);
+                  funcObject.observer = observer;
+                  self.log('Observer created for: ' + functionId);
+                })(id, funcObj);
                 
               } else {
-                console.error(`Element not found for function ${id}`);
+                console.error('[pageFunctions] Element not found for function: ' + id + ' (selector: ' + options.selector + ')');
               }
             } catch (e) {
-              console.error(`Error setting up IntersectionObserver for function ${id}:`, e);
+              console.error('[pageFunctions] Error setting up function ' + id + ':', e);
             }
           }
         }
@@ -144,13 +183,10 @@ Add the following script to the `<head>` section of your HTML:
       }
     },
 
-    // New method to handle SPA transitions
     handlePageTransition: function() {
-      // Clean up existing observers and states
       this.cleanup();
-      
-      // Re-execute functions for new page content
       this.executeFunctions();
+      this.log('Page transition handled');
     }
   };
 })(window);
@@ -175,9 +211,24 @@ Initialise
 pageFunctions.executeFunctions();
 ```
 
-Destroy
+Destroy / Clean up (SPA)
 ```html
 pageFunctions.cleanup();
+```
+
+Handle SPA page transition
+```html
+pageFunctions.handlePageTransition();
+```
+
+Remove a specific function
+```html
+pageFunctions.removeFunction('functionId');
+```
+
+Enable debug logging
+```html
+pageFunctions.debug = true;
 ```
 
 ### Component Usage
@@ -212,6 +263,22 @@ pageFunctions.addFunction('lazyLoadComponent', function() {
 </script>
 ```
 
+#### Persistent Function (SPA)
+
+For functions that should survive SPA page transitions and re-run on new content:
+
+```html
+<script>
+pageFunctions.addFunction('globalAnalytics', function() {
+  // Code that should run on every page
+  console.log("Analytics tracking initialized.");
+}, {
+  immediate: true,
+  persistent: true
+});
+</script>
+```
+
 ## API Reference
 
 ### `pageFunctions.addFunction(id, fn, options)`
@@ -226,10 +293,30 @@ Adds a function to be executed either immediately or when a specified element en
   - `root` (Element|null): The root element for intersection calculations.
   - `rootMargin` (string): Margin around the root element.
   - `threshold` (number|array): Percentage of target's visibility at which to trigger execution.
+  - `persistent` (boolean): If true, function survives `cleanup()` and can re-run on SPA transitions.
+
+### `pageFunctions.removeFunction(id)`
+
+Removes a specific function and disconnects its observer if active.
+
+- `id` (string): The unique identifier of the function to remove.
+- Returns: `true` if the function was found and removed, `false` otherwise.
 
 ### `pageFunctions.executeFunctions()`
 
 Initializes the execution of all added functions. This should be called once in the footer of your HTML.
+
+### `pageFunctions.cleanup()`
+
+Disconnects all observers, removes non-persistent functions, and resets execution state for persistent functions. Used for SPA transitions.
+
+### `pageFunctions.handlePageTransition()`
+
+Convenience method that calls `cleanup()` followed by `executeFunctions()`. Use this on SPA route changes.
+
+### `pageFunctions.debug`
+
+Boolean flag. Set to `true` to enable console logging for debugging purposes.
 
 ## Examples
 
@@ -255,6 +342,41 @@ pageFunctions.addFunction('lazyLoadImages', function() {
   selector: '.image-gallery',
   rootMargin: '0px 0px 200px 0px',
   threshold: 0.1
+});
+</script>
+```
+
+### SPA with Persistent Global Functions
+
+```html
+<script>
+// This runs once and persists across page transitions
+pageFunctions.addFunction('smoothScroll', function() {
+  // Initialize smooth scrolling library
+  console.log("Smooth scroll initialized.");
+}, {
+  immediate: true,
+  persistent: true
+});
+
+// This will be cleaned up and re-registered by components on each page
+pageFunctions.addFunction('pageSpecificSlider', function() {
+  // Initialize a slider specific to this page
+  console.log("Slider initialized.");
+}, {
+  selector: '.hero-slider',
+  rootMargin: '0px 0px 100px 0px'
+});
+</script>
+```
+
+### SPA Route Change Handler
+
+```html
+<script>
+// Example with a router library
+router.on('navigate', function() {
+  pageFunctions.handlePageTransition();
 });
 </script>
 ```
